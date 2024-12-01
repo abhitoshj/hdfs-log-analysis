@@ -1,0 +1,2 @@
+influx
+CREATE DATABASE streaming_metrics
