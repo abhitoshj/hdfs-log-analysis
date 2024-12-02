@@ -6,6 +6,7 @@ from pyspark.sql import Row
 from logparser.Drain import LogParser
 from pyspark.sql.types import StructType, StructField, StringType
 from pyspark.sql.functions import to_json, struct, col, from_json, to_timestamp, concat, lit, current_timestamp
+from pyspark.sql import functions as F
 
 from pyspark.sql.functions import window, count
 
@@ -41,7 +42,7 @@ hdfs_directory = "hdfs://localhost:9050/user/raghavendra/hadooplogs/streaming/st
 kafka_df = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "localhost:9092") \
-    .option("subscribe", "log_topic") \
+    .option("subscribe", "log_topic_1") \
     .option("maxOffsetsPerTrigger", "10000") \
     .load()
 
@@ -112,12 +113,14 @@ query1 = raw_logs_df.writeStream \
     .outputMode("update") \
     .start()
 
-# Step 3: Read from Kafka Stream
+# Step 3: Read from Kafka Stream:wq
 structured_kafka_df1 = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "localhost:9092") \
     .option("subscribe", "structured_log_topic") \
     .option("minOffsetsPerTrigger", "1000000") \
+    .option("startingOffsets", "latest") \
+    .option("failOnDataLoss", "false") \
     .load()
 
 structured_kafka_df2 = spark.readStream \
@@ -141,13 +144,14 @@ def process_batch(batch_df, batch_id):
         .format("parquet") \
         .mode("append") \
         .option("path", hdfs_directory) \
-        .option("checkpointLocation", "/tmp/new3-checkpoint-structured-hdfs") \
+        .option("checkpointLocation", "/tmp/new42-checkpoint-structured-hdfs") \
         .save()
     
 # Use the function in foreachBatch
 hdfs_query = structured_df1.writeStream \
     .foreachBatch(process_batch) \
     .outputMode("append") \
+    .trigger(processingTime="30 minutes")\
     .start()
 
 structured_df2 = structured_df2.withColumn("processing_time", current_timestamp())
@@ -156,27 +160,33 @@ structured_df2 = structured_df2.withColumn(
     "timestamp",
     to_timestamp(
         concat(
-            lit("20"),  # Add the century prefix to the date
+            lit("20"), 
             col("Date"),
             lit(" "),
             col("Time")
         ),
-        "yyyyMMdd HHmmss"  # Format to interpret the combined string
+        "yyyyMMdd HHmmss"
     )
 )
 
 # Perform windowed aggregation based on the current timestamp
 aggregated_windowed_df = structured_df2 \
     .groupBy(
-        window(col("processing_time"), "1 hour"),  # 1-hour tumbling window
+        window(col("processing_time"), "1 minute"),  # 1-minute tumbling window
         col("Level")
     ) \
-    .agg(count("*").alias("event_count")) \
+    .agg(
+        F.count("*").alias("event_count"),
+        F.first("timestamp").alias("orig_first_timestamp"),
+        F.last("timestamp").alias("orig_last_timestamp")
+    ) \
     .select(
         col("window.start").alias("window_start"),
         col("window.end").alias("window_end"),
         col("Level"),
-        col("event_count")
+        col("event_count"),
+        col("orig_first_timestamp"),
+        col("orig_last_timestamp")
     )
 
 # Serialize the output as JSON for Kafka
@@ -186,7 +196,9 @@ aggregated_windowed_df_json = aggregated_windowed_df.select(
             col("window_start"),
             col("window_end"),
             col("Level"),
-            col("event_count")
+            col("event_count"),
+            col("orig_first_timestamp"),
+            col("orig_last_timestamp")
         )
     ).alias("value")
 )
@@ -195,38 +207,13 @@ aggregated_windowed_df_json = aggregated_windowed_df.select(
 query = aggregated_windowed_df_json.writeStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "localhost:9092") \
-    .option("topic", "streaming_metrics") \
+    .option("topic", "streaming_metrics_1") \
     .outputMode("update") \
-    .option("checkpointLocation", "/tmp/checkpoint-streaming-metrics-hourly") \
+    .option("checkpointLocation", "/tmp/checkpoint3-streaming-metrics-hourly") \
+    .trigger(processingTime="1 minute")\
     .start()
 
 query.awaitTermination()
-
-
-# aggregated_df = structured_df2 \
-#     .withWatermark("timestamp", "10 minutes") \
-#     .groupBy(window(col("timestamp"), "1 minute"), col("Level")) \
-#     .agg(count("*").alias("event_count"))
-
-# # aggregated_df = structured_df2 \
-# #     .groupBy("Level") \
-# #     .agg(count("*").alias("event_count"))
-
-# aggQuery = aggregated_df.writeStream \
-#     .format("console") \
-#     .outputMode("complete") \
-#     .start()
-
-# anotherQuery = aggregated_df.selectExpr("to_json(struct(*)) AS value") \
-#     .writeStream \
-#     .format("kafka") \
-#     .option("kafka.bootstrap.servers", "localhost:9092") \
-#     .option("topic", "streaming_metrics") \
-#     .outputMode("append") \
-#     .option("checkpointLocation", "/tmp/new4-checkpoint-streaming-metrics") \
-#     .start()
-
 query1.awaitTermination()
 hdfs_query.awaitTermination()
-query.awaitTermination()
 #anotherQuery.awaitTermination()
