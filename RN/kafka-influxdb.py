@@ -7,7 +7,7 @@ from datetime import datetime
 consumer = KafkaConsumer(
     'streaming_metrics_1',
     bootstrap_servers='localhost:9092',
-    auto_offset_reset='earliest',
+    auto_offset_reset='latest',
     enable_auto_commit=True,
     group_id='grafana_group'
 )

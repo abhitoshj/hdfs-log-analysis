@@ -7,8 +7,8 @@ from logparser.Drain import LogParser
 from pyspark.sql.types import StructType, StructField, StringType
 from pyspark.sql.functions import to_json, struct, col, from_json, to_timestamp, concat, lit, current_timestamp
 from pyspark.sql import functions as F
-
 from pyspark.sql.functions import window, count
+import time
 
 
 # Initialize Spark Session
@@ -21,6 +21,8 @@ spark = SparkSession.builder \
     .getOrCreate()
 
 spark.sparkContext.setLogLevel("WARN")
+
+system_metrics_topic = "logprocessing_system_metrics"
 
 # LogParser Config
 st = 0.5
@@ -92,6 +94,9 @@ schema = StructType([
 ])
 
 def process_batch(batch_df, batch_id):
+    start_time = time.time()
+    record_count = batch_df.count()
+
     print(f'processing batch {batch_id}')
     # Convert DataFrame to RDD and apply mapPartitions
     rows = batch_df.selectExpr("CAST(log_message AS STRING)").rdd.mapPartitions(process_partition).collect()
@@ -106,6 +111,20 @@ def process_batch(batch_df, batch_id):
             .option("kafka.bootstrap.servers", "localhost:9092") \
             .option("topic", "structured_log_topic") \
             .save()
+        
+    end_time = time.time()
+    latency = end_time - start_time
+    throughput = record_count / latency if latency > 0 else 0
+
+    # Send metrics to Kafka
+    metrics_df = spark.createDataFrame([
+        Row(batch_id=str(batch_id), record_count=record_count, latency=latency, throughput=throughput, timestamp = start_time)
+    ])
+    metrics_df.select(to_json(struct([col(c) for c in metrics_df.columns])).alias("value")).write \
+        .format("kafka") \
+        .option("kafka.bootstrap.servers", "localhost:9092") \
+        .option("topic", system_metrics_topic) \
+        .save()
 
 # Write Stream with foreachBatch
 query1 = raw_logs_df.writeStream \
@@ -118,7 +137,7 @@ structured_kafka_df1 = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "localhost:9092") \
     .option("subscribe", "structured_log_topic") \
-    .option("minOffsetsPerTrigger", "1000000") \
+    .option("maxOffsetsPerTrigger", "1000000") \
     .option("startingOffsets", "latest") \
     .option("failOnDataLoss", "false") \
     .load()
@@ -126,18 +145,17 @@ structured_kafka_df1 = spark.readStream \
 structured_kafka_df2 = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "localhost:9092") \
+    .option("maxOffsetsPerTrigger", "10000") \
     .option("subscribe", "structured_log_topic") \
     .load()
 
-# Extract JSON value from Kafka topic
 parsed_logs_df1 = structured_kafka_df1.selectExpr("CAST(value AS STRING) as json_value")
 parsed_logs_df2 = structured_kafka_df2.selectExpr("CAST(value AS STRING) as json_value")
 
-# Parse JSON into columns
 structured_df1 = parsed_logs_df1.select(from_json(col("json_value"), schema).alias("structured")).select("structured.*")
 structured_df2 = parsed_logs_df2.select(from_json(col("json_value"), schema).alias("structured")).select("structured.*")
 
-def process_batch(batch_df, batch_id):
+def write_to_hdfs(batch_df, batch_id):
     print(f"Processing batch {batch_id}")
     # Write to HDFS
     batch_df.write \
@@ -147,9 +165,8 @@ def process_batch(batch_df, batch_id):
         .option("checkpointLocation", "/tmp/new42-checkpoint-structured-hdfs") \
         .save()
     
-# Use the function in foreachBatch
 hdfs_query = structured_df1.writeStream \
-    .foreachBatch(process_batch) \
+    .foreachBatch(write_to_hdfs) \
     .outputMode("append") \
     .trigger(processingTime="30 minutes")\
     .start()
@@ -169,7 +186,6 @@ structured_df2 = structured_df2.withColumn(
     )
 )
 
-# Perform windowed aggregation based on the current timestamp
 aggregated_windowed_df = structured_df2 \
     .groupBy(
         window(col("processing_time"), "1 minute"),  # 1-minute tumbling window
@@ -189,7 +205,6 @@ aggregated_windowed_df = structured_df2 \
         col("orig_last_timestamp")
     )
 
-# Serialize the output as JSON for Kafka
 aggregated_windowed_df_json = aggregated_windowed_df.select(
     to_json(
         struct(
@@ -203,7 +218,6 @@ aggregated_windowed_df_json = aggregated_windowed_df.select(
     ).alias("value")
 )
 
-# Write the aggregated data to Kafka
 query = aggregated_windowed_df_json.writeStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "localhost:9092") \
@@ -214,6 +228,7 @@ query = aggregated_windowed_df_json.writeStream \
     .start()
 
 query.awaitTermination()
+
 query1.awaitTermination()
 hdfs_query.awaitTermination()
-#anotherQuery.awaitTermination()
+query.awaitTermination()
