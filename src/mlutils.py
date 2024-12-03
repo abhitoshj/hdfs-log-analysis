@@ -1,3 +1,7 @@
+"""
+This module contains utility functions for machine learning tasks.
+"""
+
 import re
 from pyspark.sql import functions as F
 from pyspark.sql.functions import col, udf, collect_list, rand, explode

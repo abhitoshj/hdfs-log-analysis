@@ -1,3 +1,9 @@
+"""
+This script processes the raw HDFS logs and converts them into structured logs using the Drain algorithm.
+
+The structured logs are then saved as parquet files in HDFS.
+"""
+
 import csv
 import logging
 import os

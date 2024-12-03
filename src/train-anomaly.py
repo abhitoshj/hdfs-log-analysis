@@ -1,3 +1,9 @@
+"""
+This script trains a logistic regression model on the HDFS structured log data to detect anomalies.
+
+TF-IDF is used to extract features from the log messages.
+"""
+
 import os
 from mlutils import FeatureExtractorSpark, extract_blkid_machine_info, load_HDFS_spark
 from pyspark.sql import SparkSession

@@ -1,3 +1,10 @@
+"""
+This script reads log files from a specified directory and sends each line
+as a message to a Kafka topic using a Kafka producer.
+
+This is a utility that emulates a log producer that sends log messages to a Kafka topic.
+"""
+
 from kafka import KafkaProducer
 import os
 import time

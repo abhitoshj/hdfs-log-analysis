@@ -1,3 +1,7 @@
+"""
+This script reads the structured logs from HDFS, predicts anomalies and displays the block ids with anomalies.
+"""
+
 import sys
 import logging
 from pyspark.sql import SparkSession
