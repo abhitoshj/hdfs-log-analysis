@@ -1,16 +1,13 @@
 #!/bin/bash
 
-# Script Description:
 # This script creates three buckets in InfluxDB with the names "A", "B", and "C". 
 # It uses the InfluxDB HTTP API to create the buckets with an optional retention period.
 # If no retention period is provided, the buckets are created with an infinite retention period ("never").
 # The script accepts the following arguments:
-#   - INFLUXDB_URL (optional): The URL of the InfluxDB instance (defaults to http://localhost:8086).
 #   - INFLUXDB_TOKEN (required): The InfluxDB access token used for authentication.
 #   - INFLUXDB_ORG (required): The InfluxDB organization ID where the buckets will be created.
-#   - RETENTION_PERIOD (optional): The retention period in seconds (defaults to 0, which means infinite retention).
 #
-# The script will create the buckets A, B, and C automatically and handle the response to confirm successful creation.
+# The script will create the bucket des_event_count automatically and handle the response to confirm successful creation.
 # If the bucket creation fails, the script will exit with an error message and display the InfluxDB response.
 
 if ! command -v jq &> /dev/null; then
@@ -29,7 +26,7 @@ echo "$INFLUXDB_ORG"
 
 if [[ -z "$INFLUXDB_TOKEN" || -z "$INFLUXDB_ORG" ]]; then
   echo "Error: InfluxDB Token and Organization ID are required."
-  echo "Usage: $0 [INFLUXDB_URL] <INFLUXDB_TOKEN> <INFLUXDB_ORG> [RETENTION_PERIOD]"
+  echo "Usage: $0 <INFLUXDB_TOKEN> <INFLUXDB_ORG>"
   exit 1
 fi
 
@@ -42,8 +39,7 @@ if [ "$ORG_ID" == "null" ] || [ -z "$ORG_ID" ]; then
 fi
 
 BUCKET_NAMES=(
-    "des_event_count",
-    "des_anomaly_count"
+    "des_event_count"
 )
 
 for BUCKET_NAME in "${BUCKET_NAMES[@]}"; do
