@@ -7,6 +7,7 @@ It generates and saves the following reports:
     - Write Latency Report: Calculates the average write latency for slow block receiver events.
     - Speed Report: Calculates the transfer speed for HDFS write operations.
     - Retry Count Report: Counts the number of retries for server connections and orders them by count.
+    - Monthly Severity Report: Groups number of log entries by log level and by months, counts distinct event ids.
 
 Each report is saved to both HDFS and a local file system in CSV format.
 """
@@ -135,11 +136,27 @@ def create_retrycount_report():
     local_file_out = f"{local_out_path_root}/{report_suffix}.csv"
     retry_result.coalesce(1).write.mode("overwrite").csv(local_file_out, header=True)
 
+def create_monthly_report(df):
+    cdf = df.withColumn('Month-Year', F.date_format(F.to_date(col('Date'), 'yyyy-MM-dd'), 'yyyyMM'))
+    grouped_df = cdf.groupBy('Level', 'Month-Year').agg(
+        F.count('EventId').alias('total_records'),
+        F.countDistinct('EventId').alias('distinct_eventid')
+    ).orderBy('Level', desc('distinct_eventid'), desc('total_records'))
+
+    print("Grouped and Sorted Record Counts:")
+    report_suffix = "groupedByMonths"
+    hdfs_out_path = f"{hdfs_out_path_root}/{report_suffix}"
+    grouped_df.write.mode("overwrite").csv(hdfs_out_path, header=True)
+
+    local_file_out = f"{local_out_path_root}/{report_suffix}.csv"
+    grouped_df.coalesce(1).write.mode("overwrite").csv(local_file_out, header=True)
+
 
 create_exceptions_report()
 create_logseverity_report()
 create_writelatency_report()  
 create_speed_report()
 create_retrycount_report()
+create_monthly_report(df)
 
 spark.stop()
