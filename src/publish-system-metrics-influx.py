@@ -9,8 +9,8 @@ KAFKA_TOPIC = "logprocessing_system_metrics"
 KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
 
 INFLUXDB_URL = "http://localhost:8086"
-INFLUXDB_TOKEN = "your_token"
-INFLUXDB_ORG = "your_org"
+INFLUXDB_TOKEN = "E4Ro5I-EGs-KDhFlED2LxHd1YV2BohmiAWyvjaZTVzcuoVa7oce5plfQ9J92iCSdby1MREPs4SD0Ows_ydEngg=="
+INFLUXDB_ORG = "des"
 INFLUXDB_BUCKET = "logprocessing_system_metrics"
 
 consumer = KafkaConsumer(

@@ -40,6 +40,7 @@ fi
 
 BUCKET_NAMES=(
     "des_event_count"
+    "logprocessing_system_metrics"
 )
 
 for BUCKET_NAME in "${BUCKET_NAMES[@]}"; do

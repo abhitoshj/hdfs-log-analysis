@@ -15,8 +15,8 @@ consumer = KafkaConsumer(
     group_id='grafana_group'
 )
 
-influx_client = InfluxDBClient(url='http://localhost:8086', token='your_token', org='your_org')
-bucket = 'your_bucket'
+influx_client = InfluxDBClient(url='http://localhost:8086', token='E4Ro5I-EGs-KDhFlED2LxHd1YV2BohmiAWyvjaZTVzcuoVa7oce5plfQ9J92iCSdby1MREPs4SD0Ows_ydEngg==', org='des')
+bucket = 'des_event_count'
 
 write_api = influx_client.write_api()
 
