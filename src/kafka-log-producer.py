@@ -16,6 +16,6 @@ log_folder = '/home/raghavendra/logs/hadoop/raw'
 for filename in os.listdir(log_folder):
     with open(os.path.join(log_folder, filename), 'r') as f:
         for line in f:
-            producer.send('log_topic', value=line.encode('utf-8'))
+            producer.send('log_topic_1', value=line.encode('utf-8'))
             producer.flush()
             time.sleep(0.005)
