@@ -97,7 +97,7 @@
           "tags": []
         }
       ],
-      "title": "Panel Title",
+      "title": "Event Pie Chart",
       "type": "piechart"
     },
     {
@@ -214,7 +214,7 @@
           "tags": []
         }
       ],
-      "title": "Panel Title",
+      "title": "Event Count Trend",
       "type": "timeseries"
     },
     {
@@ -649,6 +649,6 @@
   "timezone": "browser",
   "title": "DES",
   "uid": "fe5pa2f5i7v9ca",
-  "version": 6,
+  "version": 8,
   "weekStart": ""
 }
